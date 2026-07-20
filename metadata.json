@@ -1,0 +1,6 @@
+{
+  "name": "TUFA Clothing by Jude",
+  "description": "A minimalist premium African clothing brand app.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
