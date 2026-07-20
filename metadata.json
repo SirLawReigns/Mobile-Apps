@@ -1,6 +1,6 @@
 {
-  "name": "TUFA Clothing by Jude",
-  "description": "A minimalist premium African clothing brand app.",
+  "name": "Gero's Clothing",
+  "description": "The official Gero's Clothing mobile shopping experience, featuring flash sales, trend collections, and custom orders.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "TUFA Clothing by Jude"
+rootProject.name = "Gero's Clothing"
 
 include(":app")

@@ -18,6 +18,22 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+// Data structures for SHEIN-like elements
+data class ProductReview(
+    val id: String,
+    val reviewerName: String,
+    val rating: Int,
+    val comment: String,
+    val date: String
+)
+
+data class Coupon(
+    val code: String,
+    val discountPercent: Int,
+    val description: String,
+    val minSpend: Double = 0.0
+)
+
 class TufaViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: TufaRepository
 
@@ -28,6 +44,89 @@ class TufaViewModel(application: Application) : AndroidViewModel(application) {
     // Auth error handling
     private val _authError = MutableStateFlow<String?>(null)
     val authError: StateFlow<String?> = _authError.asStateFlow()
+
+    // Pre-seeded Reviews State Flow
+    private val _productReviews = MutableStateFlow<Map<String, List<ProductReview>>>(
+        mapOf(
+            "agbada_imperial" to listOf(
+                ProductReview("1", "Gero L.", 5, "Remarkable styling and fabrics! Got non-stop compliments.", "Jul 18, 2026"),
+                ProductReview("2", "Amina B.", 4, "Excellent tailoring and materials. Very luxury feel.", "Jul 15, 2026")
+            ),
+            "asooke_jacket" to listOf(
+                ProductReview("3", "Chinedu O.", 5, "Absolutely gorgeous. The Aso-Oke weaving is incredibly rich.", "Jul 10, 2026"),
+                ProductReview("4", "Sade T.", 4, "Excellent cropped design, goes beautifully with simple pants.", "Jul 11, 2026")
+            ),
+            "ankara_skirt" to listOf(
+                ProductReview("5", "Kemi S.", 5, "Sizing is very accurate and the print is extremely vibrant!", "Jul 12, 2026")
+            ),
+            "kente_kaftan" to listOf(
+                ProductReview("6", "Fatima Y.", 5, "Very breathable and elegant kaftan drape. 10/10!", "Jul 14, 2026")
+            ),
+            "senator_suit" to listOf(
+                ProductReview("7", "Ibrahim A.", 5, "Classic fit. Elegant clean embroidery and precise sewing.", "Jul 16, 2026")
+            ),
+            "coral_cap" to listOf(
+                ProductReview("8", "Chief Okey", 5, "Magnificent velvet crown with rich glass bead details.", "Jul 17, 2026")
+            )
+        )
+    )
+    val productReviews: StateFlow<Map<String, List<ProductReview>>> = _productReviews.asStateFlow()
+
+    fun addReview(productId: String, reviewerName: String, rating: Int, comment: String) {
+        val current = _productReviews.value.toMutableMap()
+        val newList = current[productId].orEmpty().toMutableList()
+        val dateFormat = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault())
+        newList.add(
+            ProductReview(
+                id = java.util.UUID.randomUUID().toString(),
+                reviewerName = reviewerName.ifBlank { "Verified Shopper" },
+                rating = rating.coerceIn(1, 5),
+                comment = comment.ifBlank { "Outstanding quality and modern styling!" },
+                date = dateFormat.format(java.util.Date())
+            )
+        )
+        current[productId] = newList
+        _productReviews.value = current
+    }
+
+    // SHEIN Promo Coupons List
+    val availableCoupons = listOf(
+        Coupon("GERO15", 15, "15% OFF on all collections"),
+        Coupon("GEROWELCOME", 10, "10% OFF Welcome Promo"),
+        Coupon("GERO30", 30, "30% OFF on orders over ₦50,000", minSpend = 50000.0)
+    )
+
+    private val _selectedCoupon = MutableStateFlow<Coupon?>(null)
+    val selectedCoupon: StateFlow<Coupon?> = _selectedCoupon.asStateFlow()
+
+    fun applyCoupon(code: String): Boolean {
+        val coupon = availableCoupons.find { it.code.trim().uppercase() == code.trim().uppercase() }
+        return if (coupon != null) {
+            _selectedCoupon.value = coupon
+            true
+        } else {
+            false
+        }
+    }
+
+    fun removeCoupon() {
+        _selectedCoupon.value = null
+    }
+
+    // Advanced search & filter states
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private val _sortBy = MutableStateFlow("Default") // "Default", "PriceLowToHigh", "PriceHighToLow", "HighestRated"
+    val sortBy: StateFlow<String> = _sortBy.asStateFlow()
+
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
+    fun setSortBy(sortOption: String) {
+        _sortBy.value = sortOption
+    }
 
     init {
         val database = AppDatabase.getDatabase(application)
@@ -168,7 +267,7 @@ class TufaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Place Order Operation
-    fun placeOrder(addressOverride: String? = null, onSuccess: () -> Unit) {
+    fun placeOrder(addressOverride: String? = null, finalTotalOverride: Double? = null, onSuccess: () -> Unit) {
         val user = _currentUser.value ?: return
         val items = cartItems.value
         if (items.isEmpty()) return
@@ -178,7 +277,8 @@ class TufaViewModel(application: Application) : AndroidViewModel(application) {
                 "${it.productName} (${it.size}, ${it.color}) x${it.quantity}"
             }
             val subtotal = items.sumOf { it.price * it.quantity }
-            val total = subtotal + 5000.00 // flat rate shipping ₦5,000
+            val baseTotal = subtotal + 5000.00 // flat rate shipping ₦5,000
+            val total = finalTotalOverride ?: baseTotal
 
             val order = Order(
                 userId = user.id,
@@ -190,6 +290,7 @@ class TufaViewModel(application: Application) : AndroidViewModel(application) {
             )
             repository.insertOrder(order)
             repository.clearCart()
+            _selectedCoupon.value = null // Reset selected coupon on purchase
             onSuccess()
         }
     }

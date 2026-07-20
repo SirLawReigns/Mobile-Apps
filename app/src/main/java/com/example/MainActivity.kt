@@ -9,6 +9,7 @@ import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -57,6 +58,7 @@ import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -100,6 +102,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Email
@@ -112,6 +115,15 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.LocalActivity
+import androidx.compose.material.icons.filled.Percent
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -169,7 +181,7 @@ fun TufaApp(viewModel: TufaViewModel) {
                                 "auth" -> "SIGN IN"
                                 "profile" -> "MY PROFILE"
                                 "admin" -> "ADMIN CONSOLE"
-                                else -> "TUFA CLOTHING BY JUDE"
+                                else -> "GERO'S CLOTHING"
                             },
                             fontFamily = FontFamily.Serif,
                             fontWeight = FontWeight.SemiBold,
@@ -423,31 +435,88 @@ fun ExploreScreen(
 ) {
     val selectedCategory by viewModel.selectedCategory.collectAsState()
     val wishlistItems by viewModel.wishlistItems.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val sortBy by viewModel.sortBy.collectAsState()
+    val productReviews by viewModel.productReviews.collectAsState()
 
     val categories = listOf("All", "Outerwear", "Knitwear", "Pants", "Shirts", "Dresses")
 
-    val filteredProducts = if (selectedCategory == "All") {
-        ProductData.products
-    } else {
-        ProductData.products.filter { it.category == selectedCategory }
+    val filteredProducts = remember(selectedCategory, searchQuery, sortBy, productReviews) {
+        var list = if (selectedCategory == "All") {
+            ProductData.products
+        } else {
+            ProductData.products.filter { it.category == selectedCategory }
+        }
+
+        if (searchQuery.isNotEmpty()) {
+            list = list.filter {
+                it.name.contains(searchQuery, ignoreCase = true) ||
+                it.description.contains(searchQuery, ignoreCase = true) ||
+                it.category.contains(searchQuery, ignoreCase = true)
+            }
+        }
+
+        when (sortBy) {
+            "PriceLowToHigh" -> list.sortedBy { it.price }
+            "PriceHighToLow" -> list.sortedByDescending { it.price }
+            "HighestRated" -> list.sortedByDescending { prod ->
+                val reviews = productReviews[prod.id].orEmpty()
+                if (reviews.isEmpty()) 4.0 else reviews.map { it.rating }.average()
+            }
+            else -> list
+        }
     }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 16.dp)
     ) {
+        // Search bar
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { viewModel.setSearchQuery(it) },
+                    placeholder = { Text("Search SHEIN-style trends, knits, dresses...", fontSize = 13.sp) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().testTag("product_search_input"),
+                    shape = RoundedCornerShape(24.dp),
+                    singleLine = true,
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        disabledContainerColor = MaterialTheme.colorScheme.surface,
+                        focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                        unfocusedIndicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                    )
+                )
+            }
+        }
+
         // Editorial Hero Banner (Using the generated 16:9 image)
         item {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(220.dp)
-                    .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+                    .height(180.dp)
+                    .padding(horizontal = 16.dp)
+                    .clip(RoundedCornerShape(16.dp))
                     .shadow(4.dp)
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.img_hero_banner),
-                    contentDescription = "TUFA Clothing by Jude Brand Banner",
+                    contentDescription = "Gero's Clothing",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
@@ -465,12 +534,12 @@ fun ExploreScreen(
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .padding(24.dp)
+                        .padding(20.dp)
                 ) {
                     Text(
                         text = "THE ART OF REDUCTION",
                         color = Color.White,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 3.sp,
                         fontFamily = FontFamily.SansSerif
@@ -479,7 +548,7 @@ fun ExploreScreen(
                     Text(
                         text = "Refined Essentials",
                         color = Color.White,
-                        fontSize = 24.sp,
+                        fontSize = 22.sp,
                         fontFamily = FontFamily.Serif,
                         fontWeight = FontWeight.Light,
                         letterSpacing = 1.sp
@@ -488,9 +557,162 @@ fun ExploreScreen(
             }
         }
 
+        // Interactive SHEIN Flash Sale Countdown
+        item {
+            var countdownSeconds by remember { mutableStateOf(8123) } // 2h 15m
+            LaunchedEffect(Unit) {
+                while (countdownSeconds > 0) {
+                    kotlinx.coroutines.delay(1000)
+                    countdownSeconds--
+                }
+            }
+            val hours = countdownSeconds / 3600
+            val mins = (countdownSeconds % 3600) / 60
+            val secs = countdownSeconds % 60
+            val timeStr = String.format("%02dh : %02dm : %02ds", hours, mins, secs)
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .shadow(2.dp, RoundedCornerShape(12.dp)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Percent, contentDescription = null, tint = Color.Yellow, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "FLASH SALE",
+                                color = Color.Yellow,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                letterSpacing = 1.5.sp
+                            )
+                        }
+                        Text(
+                            text = "Up to 70% OFF Trends",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color.White.copy(alpha = 0.2f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = timeStr,
+                            color = Color.White,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        // Claimable Coupons Section
+        item {
+            var claimedCoupons by remember { mutableStateOf(setOf<String>()) }
+            val context = LocalContext.current
+
+            Column {
+                Text(
+                    text = "CLAIM EXCLUSIVE COUPONS",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp,
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                ) {
+                    items(viewModel.availableCoupons) { coupon ->
+                        val isClaimed = claimedCoupons.contains(coupon.code)
+                        Card(
+                            modifier = Modifier
+                                .width(220.dp)
+                                .shadow(1.dp, RoundedCornerShape(8.dp)),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isClaimed) MaterialTheme.colorScheme.surfaceVariant
+                                else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = coupon.code,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = coupon.description,
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.secondary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Button(
+                                    onClick = {
+                                        if (!isClaimed) {
+                                            claimedCoupons = claimedCoupons + coupon.code
+                                            viewModel.applyCoupon(coupon.code)
+                                            Toast.makeText(context, "Coupon ${coupon.code} Applied & Copied!", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            viewModel.removeCoupon()
+                                            claimedCoupons = claimedCoupons - coupon.code
+                                            Toast.makeText(context, "Coupon Removed", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isClaimed) MaterialTheme.colorScheme.secondary
+                                        else MaterialTheme.colorScheme.primary
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                    shape = RoundedCornerShape(4.dp),
+                                    modifier = Modifier.height(28.dp)
+                                ) {
+                                    Text(
+                                        text = if (isClaimed) "CLAIMED" else "CLAIM",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Category Selection Row
         item {
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "COLLECTIONS",
                 fontSize = 11.sp,
@@ -525,6 +747,58 @@ fun ExploreScreen(
                             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                             fontFamily = FontFamily.SansSerif
                         )
+                    }
+                }
+            }
+        }
+
+        // Search & Sorting controls
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                Text(
+                    text = "SORT BY",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(
+                        "Default" to "All Items",
+                        "PriceLowToHigh" to "₦ Low-High",
+                        "PriceHighToLow" to "₦ High-Low",
+                        "HighestRated" to "Top Rated"
+                    ).forEach { (key, label) ->
+                        val isSelected = sortBy == key
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                    else MaterialTheme.colorScheme.surface
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .clickable { viewModel.setSortBy(key) }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 11.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                            )
+                        }
                     }
                 }
             }
@@ -907,7 +1181,37 @@ fun DetailScreen(
                         letterSpacing = 2.sp,
                         fontFamily = FontFamily.SansSerif
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    val reviews by viewModel.productReviews.collectAsState()
+                    val prodReviews = reviews[product.id].orEmpty()
+                    val avgRating = if (prodReviews.isEmpty()) 4.8 else prodReviews.map { it.rating }.average()
+                    val ratingCount = if (prodReviews.isEmpty()) 4 else prodReviews.size
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(top = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = "Rating",
+                            tint = Color(0xFFFFB300),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = String.format("%.1f", avgRating),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "(${ratingCount} Reviews)",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = product.name,
                         fontSize = 28.sp,
@@ -1018,6 +1322,179 @@ fun DetailScreen(
                                     fontFamily = FontFamily.SansSerif
                                 )
                             }
+                        }
+                    }
+                }
+            }
+
+            // SHEIN Interactive product reviews list
+            item {
+                Spacer(modifier = Modifier.height(24.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                ) {
+                    val reviews by viewModel.productReviews.collectAsState()
+                    val prodReviews = reviews[product.id].orEmpty()
+
+                    Text(
+                        text = "CUSTOMER REVIEWS (${prodReviews.size})",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.secondary,
+                        letterSpacing = 1.5.sp,
+                        fontFamily = FontFamily.SansSerif
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (prodReviews.isEmpty()) {
+                        Text(
+                            text = "No reviews yet. Be the first to share your thoughts!",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    } else {
+                        prodReviews.forEach { rev ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 6.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = rev.reviewerName,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            text = rev.date,
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.secondary
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        repeat(5) { starIndex ->
+                                            Icon(
+                                                imageVector = if (starIndex < rev.rating) Icons.Default.Star else Icons.Default.StarBorder,
+                                                contentDescription = null,
+                                                tint = Color(0xFFFFB300),
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = rev.comment,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Interactive Write a Review form
+            item {
+                var reviewerName by remember { mutableStateOf("") }
+                var reviewComment by remember { mutableStateOf("") }
+                var selectedStars by remember { mutableStateOf(5) }
+                val currentUser by viewModel.currentUser.collectAsState()
+
+                Spacer(modifier = Modifier.height(24.dp))
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(12.dp)),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "WRITE A PRODUCT REVIEW",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            letterSpacing = 1.5.sp,
+                            fontFamily = FontFamily.SansSerif
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Star selector
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text("Your Rating: ", fontSize = 13.sp, color = MaterialTheme.colorScheme.secondary)
+                            repeat(5) { idx ->
+                                val starRating = idx + 1
+                                IconButton(
+                                    onClick = { selectedStars = starRating },
+                                    modifier = Modifier.size(24.dp).testTag("star_select_$starRating")
+                                ) {
+                                    Icon(
+                                        imageVector = if (starRating <= selectedStars) Icons.Default.Star else Icons.Default.StarBorder,
+                                        contentDescription = "Rate $starRating Stars",
+                                        tint = Color(0xFFFFB300),
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Name input
+                        OutlinedTextField(
+                            value = reviewerName,
+                            onValueChange = { reviewerName = it },
+                            placeholder = { Text("Your Name (Optional)", fontSize = 12.sp) },
+                            modifier = Modifier.fillMaxWidth().testTag("review_name_input"),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Comment input
+                        OutlinedTextField(
+                            value = reviewComment,
+                            onValueChange = { reviewComment = it },
+                            placeholder = { Text("Share your experience with this apparel...", fontSize = 12.sp) },
+                            modifier = Modifier.fillMaxWidth().height(80.dp).testTag("review_comment_input"),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Button(
+                            onClick = {
+                                val nameStr = if (reviewerName.isBlank() && currentUser != null) {
+                                    currentUser!!.fullName
+                                } else {
+                                    reviewerName
+                                }
+                                viewModel.addReview(product.id, nameStr, selectedStars, reviewComment)
+                                reviewerName = ""
+                                reviewComment = ""
+                                selectedStars = 5
+                                Toast.makeText(context, "Review submitted successfully!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.fillMaxWidth().testTag("submit_review_button"),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("SUBMIT REVIEW", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -1248,7 +1725,68 @@ fun CartScreen(
                 ) {
                     val subtotal = cartItems.sumOf { it.price * it.quantity }
                     val shipping = 0.00 // Free brand shipping
-                    val total = subtotal + shipping
+                    val selectedCoupon by viewModel.selectedCoupon.collectAsState()
+
+                    val discountPercent = selectedCoupon?.discountPercent ?: 0
+                    val discountAmount = (subtotal * discountPercent) / 100.0
+                    val total = (subtotal - discountAmount) + shipping
+
+                    // Interactive Coupon Apply Input Row
+                    var promoInput by remember(selectedCoupon) { mutableStateOf(selectedCoupon?.code ?: "") }
+                    val context = LocalContext.current
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = promoInput,
+                            onValueChange = { promoInput = it },
+                            placeholder = { Text("PROMO OR COUPON CODE", fontSize = 11.sp, letterSpacing = 1.sp) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .testTag("coupon_input_field"),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true,
+                            trailingIcon = {
+                                if (selectedCoupon != null) {
+                                    IconButton(onClick = {
+                                        viewModel.removeCoupon()
+                                        promoInput = ""
+                                        Toast.makeText(context, "Promo code removed", Toast.LENGTH_SHORT).show()
+                                    }) {
+                                        Icon(Icons.Default.Close, contentDescription = "Clear promo", modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                            },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                            )
+                        )
+
+                        Button(
+                            onClick = {
+                                if (promoInput.isNotBlank()) {
+                                    val success = viewModel.applyCoupon(promoInput)
+                                    if (success) {
+                                        Toast.makeText(context, "Promo Applied Successfully!", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(context, "Invalid Promo Code", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
+                            modifier = Modifier.height(48.dp).testTag("coupon_apply_btn"),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Text("APPLY", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1268,6 +1806,30 @@ fun CartScreen(
                             fontFamily = FontFamily.SansSerif
                         )
                     }
+                    
+                    if (selectedCoupon != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "DISCOUNT (${selectedCoupon!!.code} -${selectedCoupon!!.discountPercent}%)",
+                                fontSize = 12.sp,
+                                color = Color(0xFF43A047),
+                                fontFamily = FontFamily.SansSerif,
+                                letterSpacing = 1.sp
+                            )
+                            Text(
+                                text = "-₦${String.format("%,.2f", discountAmount)}",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF43A047),
+                                fontFamily = FontFamily.SansSerif
+                            )
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1325,7 +1887,7 @@ fun CartScreen(
                             if (currentUser == null) {
                                 onAuthRedirect()
                             } else {
-                                viewModel.placeOrder {
+                                viewModel.placeOrder(finalTotalOverride = total) {
                                     onCheckoutSuccess()
                                 }
                             }
@@ -1487,7 +2049,7 @@ fun CheckoutSuccessOverlay(onDismiss: () -> Unit) {
             Spacer(modifier = Modifier.height(12.dp))
 
             Text(
-                text = "Thank you for your purchase. Your TUFA Clothing by Jude essentials are being prepared for dispatch.",
+                text = "Thank you for your purchase. Your Gero's Clothing essentials are being prepared for dispatch." ,
                 color = MaterialTheme.colorScheme.secondary,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center,
@@ -1557,7 +2119,7 @@ fun AuthScreen(
             
             // Brand Logo Visual
             Text(
-                text = "TUFA",
+                text = "GERO'S",
                 fontFamily = FontFamily.Serif,
                 fontWeight = FontWeight.Light,
                 fontSize = 48.sp,
@@ -1567,7 +2129,7 @@ fun AuthScreen(
             )
             
             Text(
-                text = "CONTEMPORARY AFRICAN COUTURE",
+                text = "TRENDY CONTEMPORARY COUTURE",
                 fontFamily = FontFamily.SansSerif,
                 fontWeight = FontWeight.Medium,
                 fontSize = 10.sp,
@@ -1761,7 +2323,7 @@ fun AuthScreen(
                     ) {
                         Button(
                             onClick = {
-                                email = "jude@tufa.com"
+                                email = "jude@geros.com"
                                 password = "password123"
                                 isSignUp = false
                             },
@@ -1773,7 +2335,7 @@ fun AuthScreen(
                         }
                         Button(
                             onClick = {
-                                email = "admin@tufa.com"
+                                email = "admin@geros.com"
                                 password = "admin123"
                                 isSignUp = false
                             },
@@ -1806,6 +2368,7 @@ fun ProfileScreen(
     var fullName by remember { mutableStateOf(currentUser?.fullName ?: "") }
     var phone by remember { mutableStateOf(currentUser?.phone ?: "") }
     var address by remember { mutableStateOf(currentUser?.address ?: "") }
+    var expandedOrderTrackerIds by remember { mutableStateOf(setOf<Int>()) }
 
     LazyColumn(
         modifier = Modifier
@@ -2031,7 +2594,7 @@ fun ProfileScreen(
                                 .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
-                            Text("TUFAWELCOME", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Text("GEROWELCOME", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
@@ -2152,6 +2715,47 @@ fun ProfileScreen(
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
                             )
+                        }
+
+                        val isTracked = expandedOrderTrackerIds.contains(order.id)
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        OutlinedButton(
+                            onClick = {
+                                expandedOrderTrackerIds = if (isTracked) {
+                                    expandedOrderTrackerIds - order.id
+                                } else {
+                                    expandedOrderTrackerIds + order.id
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().height(40.dp).testTag("track_shipment_${order.id}"),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isTracked) Icons.Default.VisibilityOff else Icons.Default.LocalActivity,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = if (isTracked) "HIDE TRACKING DETAILS" else "TRACK LIVE SHIPMENT",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.sp
+                                )
+                            }
+                        }
+
+                        if (isTracked) {
+                            OrderTrackerTimeline(status = order.status)
                         }
                     }
                 }
@@ -2450,6 +3054,118 @@ fun AdminDashboardScreen(
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun OrderTrackerTimeline(status: String) {
+    // Determine step indices:
+    // 0 -> Order Placed
+    // 1 -> Stitching & Quality Control
+    // 2 -> Shipped & In-Transit
+    // 3 -> Delivered & Received
+    val currentStep = when (status) {
+        "Processing" -> 1
+        "Shipped" -> 2
+        "Delivered" -> 3
+        else -> 0 // Placed
+    }
+
+    val steps = listOf(
+        "Order Placed" to "Your order has been received and confirmed.",
+        "Stitching & Quality Control" to "Our master tailors are crafting your Gero's Clothing apparel.",
+        "Shipped & In-Transit" to "Dispatched from Gero's Warehouse via premium courier.",
+        "Delivered & Received" to "Arrived safely at your shipping address."
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp, bottom = 4.dp)
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.02f), RoundedCornerShape(8.dp))
+            .padding(12.dp)
+    ) {
+        Text(
+            text = "LIVE SHIPMENT TRACKER",
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            letterSpacing = 1.sp,
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+
+        steps.forEachIndexed { index, (title, description) ->
+            val isActive = index <= currentStep
+            val isLast = index == steps.lastIndex
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top
+            ) {
+                // Timeline left-bar line and bullet circle
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.width(24.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(16.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isActive) MaterialTheme.colorScheme.primary 
+                                else MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (index < currentStep) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Completed",
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(10.dp)
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White)
+                            )
+                        }
+                    }
+
+                    if (!isLast) {
+                        Box(
+                            modifier = Modifier
+                                .width(2.dp)
+                                .height(32.dp)
+                                .background(
+                                    if (index < currentStep) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                // Step content details
+                Column(modifier = Modifier.padding(bottom = 16.dp)) {
+                    Text(
+                        text = title.uppercase(),
+                        fontSize = 11.sp,
+                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f)
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = description,
+                        fontSize = 11.sp,
+                        color = if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.8f) else MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)
+                    )
                 }
             }
         }
